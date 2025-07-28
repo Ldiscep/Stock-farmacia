@@ -1,16 +1,19 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
 import sqlite3
-import openpyxl
-from datetime import datetime
-
 import os
+from datetime import datetime
+import openpyxl
+from tkinter import Listbox
+
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+from tkinter import messagebox
+
+# Ruta de base de datos
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "farmacia.db")
 
-# --------- CONFIGURACIÓN DE LA BASE DE DATOS ---------
+# --------- INICIALIZAR BASE ---------
 def inicializar_db():
     conn = sqlite3.connect(DB_PATH)
-
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS drogas (
@@ -46,12 +49,15 @@ def inicializar_db():
     conn.commit()
     conn.close()
 
-# --------- FUNCIONES DE OPERACIÓN ---------
+# --------- FUNCIONES ---------
+def limpiar_ventana():
+    for widget in app.winfo_children():
+        widget.destroy()
+
 def actualizar_stock(nombre_droga, cantidad, operacion):
     conn = sqlite3.connect(DB_PATH)
-
     c = conn.cursor()
-    c.execute("SELECT stock FROM drogas WHERE nombre LIKE ?", (nombre_droga,))
+    c.execute("SELECT stock FROM drogas WHERE nombre = ?", (nombre_droga,))
     result = c.fetchone()
     if result:
         nuevo_stock = result[0] + cantidad if operacion == 'ingreso' else result[0] - cantidad
@@ -60,17 +66,13 @@ def actualizar_stock(nombre_droga, cantidad, operacion):
         else:
             c.execute("UPDATE drogas SET stock = ? WHERE nombre = ?", (nuevo_stock, nombre_droga))
             conn.commit()
-            messagebox.showinfo("Éxito", f"Stock actualizado. Nuevo stock: {nuevo_stock}")
+            messagebox.showinfo("Éxito", f"Nuevo stock: {nuevo_stock}")
     else:
         messagebox.showerror("Error", "Droga no encontrada.")
     conn.close()
-def limpiar_ventana():
-    for widget in root.winfo_children():
-        widget.destroy()
 
 def exportar_a_excel():
     conn = sqlite3.connect(DB_PATH)
-
     c = conn.cursor()
     c.execute("SELECT codigo, nombre, stock FROM drogas ORDER BY nombre ASC")
     datos = c.fetchall()
@@ -79,54 +81,49 @@ def exportar_a_excel():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Stock Drogas"
-
-    # Encabezados
     ws.append(["Código", "Nombre", "Stock Actual"])
-
-    # Filas de datos
     for fila in datos:
         ws.append(fila)
 
-    # Guardar con timestamp en la misma carpeta que el script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"stock_farmacia_{timestamp}.xlsx"
-    filepath = os.path.join(script_dir, filename)
-    wb.save(filepath)
+    carpeta = os.path.dirname(os.path.abspath(__file__))
+    nombre = f"stock_farmacia_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    ruta = os.path.join(carpeta, nombre)
+    wb.save(ruta)
+    messagebox.showinfo("Exportación Exitosa", f"Archivo guardado:\n{ruta}")
 
-    messagebox.showinfo("Exportación Exitosa", f"Se exportó correctamente a:\n{filepath}")
-
-# --------- INTERFAZ ---------
 def abrir_operacion(tipo):
     limpiar_ventana()
+    ttk.Label(app, text=f"{tipo.capitalize()} de Producto", font=('Segoe UI', 18)).pack(pady=10)
 
-    root.title(f"{tipo.capitalize()} de Producto")
+    ttk.Label(app, text="Buscar droga:").pack()
+    entry_busqueda = ttk.Entry(app, width=50)
+    entry_busqueda.pack(pady=5)
 
-    tk.Label(root, text=f"{tipo.capitalize()} de Producto", font=('Arial', 16)).pack(pady=10)
+    lista = Listbox(app, width=70, height=10)
 
-    tk.Label(root, text="Buscar droga:").pack()
-    entry_busqueda = tk.Entry(root, width=50)
-    entry_busqueda.pack()
-
-    lista = tk.Listbox(root, width=70, height=10)
     lista.pack(pady=5)
 
     def buscar(event=None):
-        lista.delete(0, tk.END)
+        lista.delete(0, 'end')
         texto = entry_busqueda.get().upper()
         conn = sqlite3.connect(DB_PATH)
-
         c = conn.cursor()
-        c.execute("SELECT nombre, stock FROM drogas WHERE nombre LIKE ?", (f"%{texto}%",))
+        if texto:
+            c.execute("SELECT nombre, stock FROM drogas WHERE nombre LIKE ? ORDER BY stock DESC", (f"%{texto}%",))
+        else:
+            c.execute("SELECT nombre, stock FROM drogas ORDER BY stock DESC")
         for nombre, stock in c.fetchall():
-            lista.insert(tk.END, f"{nombre}    Actual: {stock}")
+            lista.insert('end', f"{nombre}    Actual: {stock}")
         conn.close()
 
-    entry_busqueda.bind("<KeyRelease>", buscar)
 
-    tk.Label(root, text="Cantidad:").pack()
-    entry_cantidad = tk.Entry(root)
-    entry_cantidad.pack()
+    entry_busqueda.bind("<KeyRelease>", buscar)
+    buscar()  # para mostrar todo al principio, ordenado por stock
+
+
+    ttk.Label(app, text="Cantidad:").pack()
+    entry_cantidad = ttk.Entry(app)
+    entry_cantidad.pack(pady=5)
 
     def confirmar():
         seleccion = lista.curselection()
@@ -143,25 +140,24 @@ def abrir_operacion(tipo):
             messagebox.showerror("Error", "Cantidad inválida.")
             return
         actualizar_stock(nombre, cantidad, tipo)
-        abrir_menu_principal()  # volver al menú principal luego del ingreso/egreso
+        abrir_menu_principal()
 
-    tk.Button(root, text="Confirmar", command=confirmar, width=30).pack(pady=5)
-    tk.Button(root, text="Volver al Menú", command=abrir_menu_principal, width=30).pack(pady=5)
+    ttk.Button(app, text="Confirmar", bootstyle=SUCCESS, command=confirmar, width=30).pack(pady=5)
+    ttk.Button(app, text="Volver al Menú", bootstyle=SECONDARY, command=abrir_menu_principal, width=30).pack(pady=5)
 
-# --------- MENÚ PRINCIPAL ---------
-root = tk.Tk()
-root.geometry("800x600")  # Tamaño más grande
 def abrir_menu_principal():
     limpiar_ventana()
+    ttk.Label(app, text="Control de Stock de Drogas", font=('Segoe UI', 20)).pack(pady=20)
+    ttk.Button(app, text="Ingreso de Producto", width=30, bootstyle=SUCCESS, command=lambda: abrir_operacion("ingreso")).pack(pady=10)
+    ttk.Button(app, text="Egreso de Producto", width=30, bootstyle=WARNING, command=lambda: abrir_operacion("egreso")).pack(pady=10)
+    ttk.Button(app, text="Exportar stock a Excel", width=30, bootstyle=INFO, command=exportar_a_excel).pack(pady=10)
+    ttk.Button(app, text="Salir", width=30, bootstyle=DANGER, command=app.quit).pack(pady=10)
 
-    root.title("Control de Stock de Drogas")
-    tk.Label(root, text="Menú principal", font=('Arial', 16)).pack(pady=10)
-
-    tk.Button(root, text="Ingreso de Producto", width=30, command=lambda: abrir_operacion("ingreso")).pack(pady=5)
-    tk.Button(root, text="Egreso de Producto", width=30, command=lambda: abrir_operacion("egreso")).pack(pady=5)
-    tk.Button(root, text="Exportar stock a Excel", width=30, command=exportar_a_excel).pack(pady=5)
-    tk.Button(root, text="Salir", width=30, command=root.quit).pack(pady=5)
+# --------- INICIO ---------
+app = ttk.Window(themename="cosmo")  # podés probar con "flatly", "superhero", etc.
+app.title("Farmacia - Control de Stock")
+app.geometry("800x600")
 
 inicializar_db()
 abrir_menu_principal()
-root.mainloop()
+app.mainloop()
