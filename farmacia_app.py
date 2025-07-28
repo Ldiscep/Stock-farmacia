@@ -246,6 +246,14 @@ def abrir_menu_principal():
     ttk.Button(app, text="Egreso de Producto", width=30, bootstyle=WARNING, command=lambda: abrir_operacion("egreso")).pack(pady=10)
     ttk.Button(app, text="Exportar stock a Excel", width=30, bootstyle=INFO, command=exportar_a_excel).pack(pady=10)
     ttk.Button(app, text="Elementos vencidos", width=30, bootstyle=SECONDARY, command=mostrar_vencidos).pack(pady=10)
+    # Leyenda de colores - productos por vencer
+    frame_leyenda = ttk.Frame(app)
+    frame_leyenda.place(relx=1.0, rely=1.0, anchor='se', x=-20, y=-20)
+
+    ttk.Label(frame_leyenda, text="● Vencido", foreground="red", font=('Segoe UI', 9)).pack(anchor="e", pady=1)
+    ttk.Label(frame_leyenda, text="● Vence en ≤7 días", foreground="orange", font=('Segoe UI', 9)).pack(anchor="e", pady=1)
+    ttk.Label(frame_leyenda, text="● Sin vencimiento próximo", foreground="black", font=('Segoe UI', 9)).pack(anchor="e", pady=1)
+
     ttk.Button(app, text="Salir", width=30, bootstyle=DANGER, command=app.quit).pack(pady=10)
     procesar_vencidos()
 
